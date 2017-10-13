@@ -33,7 +33,7 @@
 
 /obj/effect/ebeam/vine
 	name = "thick vine"
-	mouse_opacity = 1
+	mouse_opacity = MOUSE_OPACITY_ICON
 	desc = "A thick vine, painful to the touch."
 
 
@@ -42,7 +42,7 @@
 		var/mob/living/L = AM
 		if(!("vines" in L.faction))
 			L.adjustBruteLoss(5)
-			L << "<span class='alert'>You cut yourself on the thorny vines.</span>"
+			to_chat(L, "<span class='alert'>You cut yourself on the thorny vines.</span>")
 
 
 
@@ -94,7 +94,7 @@
 				if(prob(grasp_pull_chance))
 					setDir(get_dir(src,L) )//staaaare
 					step(L,get_dir(L,src)) //reel them in
-					L.Weaken(3) //you can't get away now~
+					L.Knockdown(60) //you can't get away now~
 
 		if(grasping.len < max_grasps)
 			grasping:
@@ -107,7 +107,7 @@
 							if(A.density && A != L)
 								continue grasping
 					if(prob(grasp_chance))
-						L << "<span class='userdanger'>\The [src] has you entangled!</span>"
+						to_chat(L, "<span class='userdanger'>\The [src] has you entangled!</span>")
 						grasping[L] = Beam(L, "vine", time=INFINITY, maxdistance=5, beam_type=/obj/effect/ebeam/vine)
 
 						break //only take 1 new victim per cycle

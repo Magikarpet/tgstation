@@ -21,7 +21,7 @@
 			ban["ckey"] = ckey
 
 			if (get_stickyban_from_ckey(ckey))
-				usr << "<span class='adminnotice'>Error: Can not add a stickyban: User already has a current sticky ban</span>"
+				to_chat(usr, "<span class='adminnotice'>Error: Can not add a stickyban: User already has a current sticky ban</span>")
 
 			if (data["reason"])
 				ban["message"] = data["reason"]
@@ -43,12 +43,12 @@
 
 			var/ban = get_stickyban_from_ckey(ckey)
 			if (!ban)
-				usr << "<span class='adminnotice'>Error: No sticky ban for [ckey] found!</span>"
+				to_chat(usr, "<span class='adminnotice'>Error: No sticky ban for [ckey] found!</span>")
 				return
 			if (alert("Are you sure you want to remove the sticky ban on [ckey]?","Are you sure","Yes","No") == "No")
 				return
 			if (!get_stickyban_from_ckey(ckey))
-				usr << "<span class='adminnotice'>Error: The ban disappeared.</span>"
+				to_chat(usr, "<span class='adminnotice'>Error: The ban disappeared.</span>")
 				return
 			world.SetConfig("ban",ckey, null)
 
@@ -64,7 +64,7 @@
 			var/alt = ckey(data["alt"])
 			var/ban = get_stickyban_from_ckey(ckey)
 			if (!ban)
-				usr << "<span class='adminnotice'>Error: No sticky ban for [ckey] found!</span>"
+				to_chat(usr, "<span class='adminnotice'>Error: No sticky ban for [ckey] found!</span>")
 				return
 
 			var/found = 0
@@ -75,7 +75,7 @@
 					break
 
 			if (!found)
-				usr << "<span class='adminnotice'>Error: [alt] is not linked to [ckey]'s sticky ban!</span>"
+				to_chat(usr, "<span class='adminnotice'>Error: [alt] is not linked to [ckey]'s sticky ban!</span>")
 				return
 
 			if (alert("Are you sure you want to disassociate [alt] from [ckey]'s sticky ban? \nNote: Nothing stops byond from re-linking them","Are you sure","Yes","No") == "No")
@@ -84,7 +84,7 @@
 			//we have to do this again incase something changes
 			ban = get_stickyban_from_ckey(ckey)
 			if (!ban)
-				usr << "<span class='adminnotice'>Error: The ban disappeared.</span>"
+				to_chat(usr, "<span class='adminnotice'>Error: The ban disappeared.</span>")
 				return
 
 			found = 0
@@ -95,7 +95,7 @@
 					break
 
 			if (!found)
-				usr << "<span class='adminnotice'>Error: [alt] link to [ckey]'s sticky ban disappeared.</span>"
+				to_chat(usr, "<span class='adminnotice'>Error: [alt] link to [ckey]'s sticky ban disappeared.</span>")
 				return
 
 			world.SetConfig("ban",ckey,list2stickyban(ban))
@@ -109,7 +109,7 @@
 			var/ckey = data["ckey"]
 			var/ban = get_stickyban_from_ckey(ckey)
 			if (!ban)
-				usr << "<span class='adminnotice'>Error: No sticky ban for [ckey] found!"
+				to_chat(usr, "<span class='adminnotice'>Error: No sticky ban for [ckey] found!</span>")
 				return
 			var/oldreason = ban["message"]
 			var/reason = input(usr,"Reason","Reason","[ban["message"]]") as text|null
@@ -118,7 +118,7 @@
 			//we have to do this again incase something changed while we waited for input
 			ban = get_stickyban_from_ckey(ckey)
 			if (!ban)
-				usr << "<span class='adminnotice'>Error: The ban disappeared.</span>"
+				to_chat(usr, "<span class='adminnotice'>Error: The ban disappeared.</span>")
 				return
 			ban["message"] = "[reason]"
 
@@ -135,11 +135,11 @@
 				return
 			var/ban = get_stickyban_from_ckey(ckey)
 			if (!ban)
-				usr << "<span class='adminnotice'>Error: No sticky ban for [ckey] found!"
+				to_chat(usr, "<span class='adminnotice'>Error: No sticky ban for [ckey] found!</span>")
 				return
 			var/cached_ban = SSstickyban.cache[ckey]
 			if (!cached_ban)
-				usr << "<span class='adminnotice'>Error: No cached sticky ban for [ckey] found!"
+				to_chat(usr, "<span class='adminnotice'>Error: No cached sticky ban for [ckey] found!</span>")
 			world.SetConfig("ban",ckey,null)
 
 			log_admin_private("[key_name(usr)] has reverted [ckey]'s sticky ban to it's state at round start.")
@@ -152,11 +152,11 @@
 
 /datum/admins/proc/stickyban_gethtml(ckey, ban)
 	. = {"
-		<a href='?_src_=holder;stickyban=remove&ckey=[ckey]'>\[-\]</a>
-		<a href='?_src_=holder;stickyban=revert&ckey=[ckey]'>\[revert\]</a>
+		<a href='?_src_=holder;[HrefToken()];stickyban=remove&ckey=[ckey]'>\[-\]</a>
+		<a href='?_src_=holder;[HrefToken()];stickyban=revert&ckey=[ckey]'>\[revert\]</a>
 		<b>[ckey]</b>
 		<br />"
-		[ban["message"]] <b><a href='?_src_=holder;stickyban=edit&ckey=[ckey]'>\[Edit\]</a></b><br />
+		[ban["message"]] <b><a href='?_src_=holder;[HrefToken()];stickyban=edit&ckey=[ckey]'>\[Edit\]</a></b><br />
 	"}
 	if (ban["admin"])
 		. += "[ban["admin"]]<br />"
@@ -166,7 +166,7 @@
 	for (var/key in ban["keys"])
 		if (ckey(key) == ckey)
 			continue
-		. += "<li><a href='?_src_=holder;stickyban=remove_alt&ckey=[ckey]&alt=[ckey(key)]'>\[-\]</a>[key]</li>"
+		. += "<li><a href='?_src_=holder;[HrefToken()];stickyban=remove_alt&ckey=[ckey]&alt=[ckey(key)]'>\[-\]</a>[key]</li>"
 	. += "</ol>\n"
 
 /datum/admins/proc/stickyban_show()
@@ -185,7 +185,7 @@
 		<title>Sticky Bans</title>
 	</head>
 	<body>
-		<h2>All Sticky Bans:</h2> <a href='?_src_=holder;stickyban=add'>\[+\]</a><br>
+		<h2>All Sticky Bans:</h2> <a href='?_src_=holder;[HrefToken()];stickyban=add'>\[+\]</a><br>
 		[banhtml]
 	</body>
 	"}
@@ -233,7 +233,7 @@
 	. -= "reverting"
 
 	//storing these can sometimes cause sticky bans to start matching everybody
-	//	and isn't even needed for sticky ban matching, as the hub tracks these seperately
+	//	and isn't even needed for sticky ban matching, as the hub tracks these separately
 	. -= "IP"
 	. -= "computer_id"
 

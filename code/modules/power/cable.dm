@@ -33,7 +33,7 @@ By design, d1 is the smallest direction and d2 is the highest
 	icon_state = "0-1"
 	var/d1 = 0   // cable direction 1 (see above)
 	var/d2 = 1   // cable direction 2 (see above)
-	layer = WIRE_LAYER //Above pipes, which are at GAS_PIPE_LAYER
+	layer = WIRE_LAYER //Above hidden pipes, GAS_PIPE_HIDDEN_LAYER
 	var/cable_color = "red"
 	var/obj/item/stack/cable_coil/stored
 
@@ -66,9 +66,8 @@ By design, d1 is the smallest direction and d2 is the highest
 	icon = 'icons/obj/power_cond/power_cond_white.dmi'
 
 // the power cable object
-/obj/structure/cable/New()
-	..()
-
+/obj/structure/cable/Initialize()
+	. = ..()
 
 	// ensure d1 & d2 reflect the icon_state for entering and exiting cable
 	var/dash = findtext(icon_state, "-")
@@ -77,10 +76,11 @@ By design, d1 is the smallest direction and d2 is the highest
 
 	d2 = text2num( copytext( icon_state, dash+1 ) )
 
-	var/turf/T = src.loc			// hide if turf is not intact
+	var/turf/T = get_turf(src)			// hide if turf is not intact
 
-	if(level==1) hide(T.intact)
-	cable_list += src //add it to the global cable list
+	if(level==1)
+		hide(T.intact)
+	GLOB.cable_list += src //add it to the global cable list
 
 	if(d1)
 		stored = new/obj/item/stack/cable_coil(null,2,cable_color)
@@ -90,11 +90,11 @@ By design, d1 is the smallest direction and d2 is the highest
 /obj/structure/cable/Destroy()					// called when a cable is deleted
 	if(powernet)
 		cut_cable_from_powernet()				// update the powernets
-	cable_list -= src							//remove it from global cable list
+	GLOB.cable_list -= src							//remove it from global cable list
 	return ..()									// then go ahead and delete the cable
 
 /obj/structure/cable/deconstruct(disassembled = TRUE)
-	if(!(flags & NODECONSTRUCT))
+	if(!(flags_1 & NODECONSTRUCT_1))
 		var/turf/T = loc
 		stored.forceMove(T)
 	qdel(src)
@@ -108,14 +108,48 @@ By design, d1 is the smallest direction and d2 is the highest
 
 	if(level == 1 && isturf(loc))
 		invisibility = i ? INVISIBILITY_MAXIMUM : 0
-	updateicon()
+	update_icon()
 
-/obj/structure/cable/proc/updateicon()
+/obj/structure/cable/update_icon()
 	if(invisibility)
 		icon_state = "[d1]-[d2]-f"
 	else
 		icon_state = "[d1]-[d2]"
 
+/obj/structure/cable/proc/handlecable(obj/item/W, mob/user, params)
+	var/turf/T = get_turf(src)
+	if(T.intact)
+		return
+	if(istype(W, /obj/item/wirecutters))
+		if (shock(user, 50))
+			return
+		user.visible_message("[user] cuts the cable.", "<span class='notice'>You cut the cable.</span>")
+		stored.add_fingerprint(user)
+		investigate_log("was cut by [key_name(usr, usr.client)] in [get_area(T)]", INVESTIGATE_WIRES)
+		deconstruct()
+		return
+
+	else if(istype(W, /obj/item/stack/cable_coil))
+		var/obj/item/stack/cable_coil/coil = W
+		if (coil.get_amount() < 1)
+			to_chat(user, "<span class='warning'>Not enough cable!</span>")
+			return
+		coil.cable_join(src, user)
+
+	else if(istype(W, /obj/item/twohanded/rcl))
+		var/obj/item/twohanded/rcl/R = W
+		if(R.loaded)
+			R.loaded.cable_join(src, user)
+			R.is_empty(user)
+
+	else if(istype(W, /obj/item/device/multitool))
+		if(powernet && (powernet.avail > 0))		// is it powered?
+			to_chat(user, "<span class='danger'>[DisplayPower(powernet.avail)] in power network.</span>")
+		else
+			to_chat(user, "<span class='danger'>The cable is not powered.</span>")
+		shock(user, 5, 0.2)
+
+	src.add_fingerprint(user)
 
 // Items usable on a cable :
 //   - Wirecutters : cut it duh !
@@ -123,47 +157,21 @@ By design, d1 is the smallest direction and d2 is the highest
 //   - Multitool : get the power currently passing through the cable
 //
 /obj/structure/cable/attackby(obj/item/W, mob/user, params)
-	var/turf/T = src.loc
-	if(T.intact)
-		return
-	if(istype(W, /obj/item/weapon/wirecutters))
-		if (shock(user, 50))
-			return
-		user.visible_message("[user] cuts the cable.", "<span class='notice'>You cut the cable.</span>")
-		stored.add_fingerprint(user)
-		investigate_log("was cut by [key_name(usr, usr.client)] in [user.loc.loc]","wires")
-		deconstruct()
-		return
+	handlecable(W, user, params)
 
-	else if(istype(W, /obj/item/stack/cable_coil))
-		var/obj/item/stack/cable_coil/coil = W
-		if (coil.get_amount() < 1)
-			user << "<span class='warning'>Not enough cable!</span>"
-			return
-		coil.cable_join(src, user)
-
-	else if(istype(W, /obj/item/device/multitool))
-		if(powernet && (powernet.avail > 0))		// is it powered?
-			user << "<span class='danger'>[powernet.avail]W in power network.</span>"
-		else
-			user << "<span class='danger'>The cable is not powered.</span>"
-		shock(user, 5, 0.2)
-
-	src.add_fingerprint(user)
 
 // shock the user with probability prb
 /obj/structure/cable/proc/shock(mob/user, prb, siemens_coeff = 1)
 	if(!prob(prb))
 		return 0
 	if (electrocute_mob(user, powernet, src, siemens_coeff))
-		var/datum/effect_system/spark_spread/s = new /datum/effect_system/spark_spread
-		s.set_up(5, 1, src)
-		s.start()
+		do_sparks(5, TRUE, src)
 		return 1
 	else
 		return 0
 
 /obj/structure/cable/singularity_pull(S, current_size)
+	..()
 	if(current_size >= STAGE_FIVE)
 		deconstruct()
 
@@ -304,7 +312,7 @@ By design, d1 is the smallest direction and d2 is the highest
 	//first let's add turf cables to our powernet
 	//then we'll connect machines on turf with a node cable is present
 	for(var/AM in loc)
-		if(istype(AM,/obj/structure/cable))
+		if(istype(AM, /obj/structure/cable))
 			var/obj/structure/cable/C = AM
 			if(C.d1 == d1 || C.d2 == d1 || C.d1 == d2 || C.d2 == d2) //only connected if they have a common direction
 				if(C.powernet == powernet)
@@ -314,7 +322,7 @@ By design, d1 is the smallest direction and d2 is the highest
 				else
 					powernet.add_cable(C) //the cable was powernetless, let's just add it to our powernet
 
-		else if(istype(AM,/obj/machinery/power/apc))
+		else if(istype(AM, /obj/machinery/power/apc))
 			var/obj/machinery/power/apc/N = AM
 			if(!N.terminal)
 				continue // APC are connected through their terminal
@@ -324,7 +332,7 @@ By design, d1 is the smallest direction and d2 is the highest
 
 			to_connect += N.terminal //we'll connect the machines after all cables are merged
 
-		else if(istype(AM,/obj/machinery/power)) //other power machines
+		else if(istype(AM, /obj/machinery/power)) //other power machines
 			var/obj/machinery/power/M = AM
 
 			if(M.powernet == powernet)
@@ -382,7 +390,8 @@ By design, d1 is the smallest direction and d2 is the highest
 //needed as this can, unlike other placements, disconnect cables
 /obj/structure/cable/proc/denode()
 	var/turf/T1 = loc
-	if(!T1) return
+	if(!T1)
+		return
 
 	var/list/powerlist = power_list(T1,src,0,0) //find the other cables that ended in the centre of the turf, with or without a powernet
 	if(powerlist.len>0)
@@ -393,7 +402,7 @@ By design, d1 is the smallest direction and d2 is the highest
 			qdel(PN)
 
 // cut the cable's powernet at this cable and updates the powergrid
-/obj/structure/cable/proc/cut_cable_from_powernet()
+/obj/structure/cable/proc/cut_cable_from_powernet(remove=TRUE)
 	var/turf/T1 = loc
 	var/list/P_list
 	if(!T1)
@@ -415,7 +424,8 @@ By design, d1 is the smallest direction and d2 is the highest
 
 	var/obj/O = P_list[1]
 	// remove the cut cable from its turf and powernet, so that it doesn't get count in propagate_network worklist
-	loc = null
+	if(remove)
+		loc = null
 	powernet.remove_cable(src) //remove the cut cable from its powernet
 
 	spawn(0) //so we don't rebuild the network X times when singulo/explosion destroys a line of X cables
@@ -429,6 +439,7 @@ By design, d1 is the smallest direction and d2 is the highest
 			if(!P.connect_to_network()) //can't find a node cable on a the turf to connect to
 				P.disconnect_from_network() //remove from current network
 
+
 ///////////////////////////////////////////////
 // The cable coil object, used for laying cable
 ///////////////////////////////////////////////
@@ -437,9 +448,7 @@ By design, d1 is the smallest direction and d2 is the highest
 // Definitions
 ////////////////////////////////
 
-var/global/list/datum/stack_recipe/cable_coil_recipes = list ( \
-	new/datum/stack_recipe("cable restraints", /obj/item/weapon/restraints/handcuffs/cable, 15), \
-	)
+GLOBAL_LIST_INIT(cable_coil_recipes, list (new/datum/stack_recipe("cable restraints", /obj/item/restraints/handcuffs/cable, 15)))
 
 /obj/item/stack/cable_coil
 	name = "cable coil"
@@ -447,6 +456,8 @@ var/global/list/datum/stack_recipe/cable_coil_recipes = list ( \
 	icon = 'icons/obj/power.dmi'
 	icon_state = "coil_red"
 	item_state = "coil_red"
+	lefthand_file = 'icons/mob/inhands/equipment/tools_lefthand.dmi'
+	righthand_file = 'icons/mob/inhands/equipment/tools_righthand.dmi'
 	max_amount = MAXCOIL
 	amount = MAXCOIL
 	merge_type = /obj/item/stack/cable_coil // This is here to let its children merge between themselves
@@ -457,10 +468,11 @@ var/global/list/datum/stack_recipe/cable_coil_recipes = list ( \
 	throw_speed = 3
 	throw_range = 5
 	materials = list(MAT_METAL=10, MAT_GLASS=5)
-	flags = CONDUCT
+	flags_1 = CONDUCT_1
 	slot_flags = SLOT_BELT
 	attack_verb = list("whipped", "lashed", "disciplined", "flogged")
 	singular_name = "cable piece"
+	full_w_class = WEIGHT_CLASS_SMALL
 
 /obj/item/stack/cable_coil/cyborg
 	is_cyborg = 1
@@ -479,19 +491,21 @@ var/global/list/datum/stack_recipe/cable_coil_recipes = list ( \
 		user.visible_message("<span class='suicide'>[user] is strangling [user.p_them()]self with [src]! It looks like [user.p_theyre()] trying to commit suicide!</span>")
 	return(OXYLOSS)
 
-/obj/item/stack/cable_coil/New(loc, amount = MAXCOIL, var/param_color = null)
-	..()
-	src.amount = amount
+/obj/item/stack/cable_coil/Initialize(mapload, new_amount = null, param_color = null)
+	. = ..()
+	if(new_amount) // MAXCOIL by default
+		amount = new_amount
 	if(param_color)
 		item_color = param_color
 	pixel_x = rand(-2,2)
 	pixel_y = rand(-2,2)
 	update_icon()
-	recipes = cable_coil_recipes
+	recipes = GLOB.cable_coil_recipes
 
 ///////////////////////////////////
 // General procedures
 ///////////////////////////////////
+
 
 //you can use wires to heal robotics
 /obj/item/stack/cable_coil/attack(mob/living/carbon/human/H, mob/user)
@@ -550,63 +564,66 @@ var/global/list/datum/stack_recipe/cable_coil_recipes = list ( \
 	return new path (location)
 
 // called when cable_coil is clicked on a turf
-/obj/item/stack/cable_coil/proc/place_turf(turf/T, mob/user)
+/obj/item/stack/cable_coil/proc/place_turf(turf/T, mob/user, dirnew)
 	if(!isturf(user.loc))
 		return
 
-	if(!T.can_have_cabling())
-		user << "<span class='warning'>You can only lay cables on catwalks and plating!</span>"
+	if(!isturf(T) || T.intact || !T.can_have_cabling())
+		to_chat(user, "<span class='warning'>You can only lay cables on catwalks and plating!</span>")
 		return
 
 	if(get_amount() < 1) // Out of cable
-		user << "<span class='warning'>There is no cable left!</span>"
+		to_chat(user, "<span class='warning'>There is no cable left!</span>")
 		return
 
 	if(get_dist(T,user) > 1) // Too far
-		user << "<span class='warning'>You can't lay cable at a place that far away!</span>"
+		to_chat(user, "<span class='warning'>You can't lay cable at a place that far away!</span>")
 		return
 
-	else
-		var/dirn
-
+	var/dirn
+	if(!dirnew) //If we weren't given a direction, come up with one! (Called as null from catwalk.dm and floor.dm)
 		if(user.loc == T)
-			dirn = user.dir			// if laying on the tile we're on, lay in the direction we're facing
+			dirn = user.dir //If laying on the tile we're on, lay in the direction we're facing
 		else
 			dirn = get_dir(T, user)
+	else
+		dirn = dirnew
 
-		for(var/obj/structure/cable/LC in T)
-			if(LC.d2 == dirn && LC.d1 == 0)
-				user << "<span class='warning'>There's already a cable at that position!</span>"
-				return
+	for(var/obj/structure/cable/LC in T)
+		if(LC.d2 == dirn && LC.d1 == 0)
+			to_chat(user, "<span class='warning'>There's already a cable at that position!</span>")
+			return
 
-		var/obj/structure/cable/C = get_new_cable(T)
+	var/obj/structure/cable/C = get_new_cable(T)
 
-		//set up the new cable
-		C.d1 = 0 //it's a O-X node cable
-		C.d2 = dirn
-		C.add_fingerprint(user)
-		C.updateicon()
+	//set up the new cable
+	C.d1 = 0 //it's a O-X node cable
+	C.d2 = dirn
+	C.add_fingerprint(user)
+	C.update_icon()
 
-		//create a new powernet with the cable, if needed it will be merged later
-		var/datum/powernet/PN = new()
-		PN.add_cable(C)
+	//create a new powernet with the cable, if needed it will be merged later
+	var/datum/powernet/PN = new()
+	PN.add_cable(C)
 
-		C.mergeConnectedNetworks(C.d2) //merge the powernet with adjacents powernets
-		C.mergeConnectedNetworksOnTurf() //merge the powernet with on turf powernets
+	C.mergeConnectedNetworks(C.d2) //merge the powernet with adjacents powernets
+	C.mergeConnectedNetworksOnTurf() //merge the powernet with on turf powernets
 
-		if(C.d2 & (C.d2 - 1))// if the cable is layed diagonally, check the others 2 possible directions
-			C.mergeDiagonalsNetworks(C.d2)
+	if(C.d2 & (C.d2 - 1))// if the cable is layed diagonally, check the others 2 possible directions
+		C.mergeDiagonalsNetworks(C.d2)
 
+	use(1)
 
-		use(1)
+	if(C.shock(user, 50))
+		if(prob(50)) //fail
+			new /obj/item/stack/cable_coil(get_turf(C), 1, C.color)
+			C.deconstruct()
 
-		if (C.shock(user, 50))
-			if (prob(50)) //fail
-				C.deconstruct()
+	return C
 
 // called when cable_coil is click on an installed obj/cable
 // or click on a turf that already contains a "node" cable
-/obj/item/stack/cable_coil/proc/cable_join(obj/structure/cable/C, mob/user)
+/obj/item/stack/cable_coil/proc/cable_join(obj/structure/cable/C, mob/user, var/showerror = TRUE)
 	var/turf/U = user.loc
 	if(!isturf(U))
 		return
@@ -617,7 +634,7 @@ var/global/list/datum/stack_recipe/cable_coil_recipes = list ( \
 		return
 
 	if(get_dist(C, user) > 1)		// make sure it's close enough
-		user << "<span class='warning'>You can't lay cable at a place that far away!</span>"
+		to_chat(user, "<span class='warning'>You can't lay cable at a place that far away!</span>")
 		return
 
 
@@ -630,10 +647,11 @@ var/global/list/datum/stack_recipe/cable_coil_recipes = list ( \
 	// one end of the clicked cable is pointing towards us
 	if(C.d1 == dirn || C.d2 == dirn)
 		if(!U.can_have_cabling())						//checking if it's a plating or catwalk
-			user << "<span class='warning'>You can only lay cables on catwalks and plating!</span>"
+			if (showerror)
+				to_chat(user, "<span class='warning'>You can only lay cables on catwalks and plating!</span>")
 			return
 		if(U.intact)						//can't place a cable if it's a plating with a tile on it
-			user << "<span class='warning'>You can't lay cable there unless the floor tiles are removed!</span>"
+			to_chat(user, "<span class='warning'>You can't lay cable there unless the floor tiles are removed!</span>")
 			return
 		else
 			// cable is pointing at us, we're standing on an open tile
@@ -643,7 +661,8 @@ var/global/list/datum/stack_recipe/cable_coil_recipes = list ( \
 
 			for(var/obj/structure/cable/LC in U)		// check to make sure there's not a cable there already
 				if(LC.d1 == fdirn || LC.d2 == fdirn)
-					user << "<span class='warning'>There's already a cable at that position!</span>"
+					if (showerror)
+						to_chat(user, "<span class='warning'>There's already a cable at that position!</span>")
 					return
 
 			var/obj/structure/cable/NC = get_new_cable (U)
@@ -651,7 +670,7 @@ var/global/list/datum/stack_recipe/cable_coil_recipes = list ( \
 			NC.d1 = 0
 			NC.d2 = fdirn
 			NC.add_fingerprint()
-			NC.updateicon()
+			NC.update_icon()
 
 			//create a new powernet with the cable, if needed it will be merged later
 			var/datum/powernet/newPN = new()
@@ -687,7 +706,9 @@ var/global/list/datum/stack_recipe/cable_coil_recipes = list ( \
 			if(LC == C)			// skip the cable we're interacting with
 				continue
 			if((LC.d1 == nd1 && LC.d2 == nd2) || (LC.d1 == nd2 && LC.d2 == nd1) )	// make sure no cable matches either direction
-				user << "<span class='warning'>There's already a cable at that position!</span>"
+				if (showerror)
+					to_chat(user, "<span class='warning'>There's already a cable at that position!</span>")
+
 				return
 
 
@@ -700,7 +721,7 @@ var/global/list/datum/stack_recipe/cable_coil_recipes = list ( \
 		C.update_stored(2, item_color)
 
 		C.add_fingerprint()
-		C.updateicon()
+		C.update_icon()
 
 
 		C.mergeConnectedNetworks(C.d1) //merge the powernets...
@@ -730,9 +751,9 @@ var/global/list/datum/stack_recipe/cable_coil_recipes = list ( \
 /obj/item/stack/cable_coil/cut
 	item_state = "coil_red2"
 
-/obj/item/stack/cable_coil/cut/New(loc)
-	..()
-	src.amount = rand(1,2)
+/obj/item/stack/cable_coil/cut/Initialize(mapload)
+	. =..()
+	amount = rand(1,2)
 	pixel_x = rand(-2,2)
 	pixel_y = rand(-2,2)
 	update_icon()
@@ -770,7 +791,11 @@ var/global/list/datum/stack_recipe/cable_coil_recipes = list ( \
 	item_color = "white"
 	icon_state = "coil_white"
 
-/obj/item/stack/cable_coil/random/New()
+/obj/item/stack/cable_coil/random/Initialize(mapload)
+	. = ..()
 	item_color = pick("red","orange","yellow","green","cyan","blue","pink","white")
 	icon_state = "coil_[item_color]"
-	..()
+
+
+/obj/item/stack/cable_coil/random/five
+	amount = 5

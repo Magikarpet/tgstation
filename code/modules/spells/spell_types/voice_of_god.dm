@@ -5,6 +5,7 @@
 	cooldown_min = 0
 	level_max = 1
 	clothes_req = 0
+	action_icon = 'icons/mob/actions/actions_items.dmi'
 	action_icon_state = "voice_of_god"
 	var/command
 	var/cooldown_mod = 1
@@ -14,7 +15,7 @@
 
 /obj/effect/proc_holder/spell/voice_of_god/can_cast(mob/user = usr)
 	if(!user.can_speak())
-		user << "<span class='warning'>You are unable to speak!</span>"
+		to_chat(user, "<span class='warning'>You are unable to speak!</span>")
 		return FALSE
 	return TRUE
 

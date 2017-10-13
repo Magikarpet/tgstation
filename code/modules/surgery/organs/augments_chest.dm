@@ -1,6 +1,6 @@
 /obj/item/organ/cyberimp/chest
 	name = "cybernetic torso implant"
-	desc = "implants for the organs in your torso"
+	desc = "Implants for the organs in your torso."
 	icon_state = "chest_implant"
 	implant_overlay = "chest_implant_overlay"
 	zone = "chest"
@@ -22,7 +22,7 @@
 
 	if(owner.nutrition <= hunger_threshold)
 		synthesizing = TRUE
-		owner << "<span class='notice'>You feel less hungry...</span>"
+		to_chat(owner, "<span class='notice'>You feel less hungry...</span>")
 		owner.nutrition += 50
 		sleep(50)
 		synthesizing = FALSE
@@ -31,7 +31,7 @@
 	if(!owner)
 		return
 	owner.reagents.add_reagent("bad_food", poison_amount / severity)
-	owner << "<span class='warning'>You feel like your insides are burning.</span>"
+	to_chat(owner, "<span class='warning'>You feel like your insides are burning.</span>")
 
 
 /obj/item/organ/cyberimp/chest/nutriment/plus
@@ -61,7 +61,7 @@
 		else
 			cooldown = revive_cost + world.time
 			reviving = FALSE
-			owner << "<span class='notice'>Your reviver implant shuts down and starts recharging. It will be ready again in [revive_cost/10] seconds.</span>"
+			to_chat(owner, "<span class='notice'>Your reviver implant shuts down and starts recharging. It will be ready again in [DisplayTimeText(revive_cost)].</span>")
 		return
 
 	if(cooldown > world.time)
@@ -73,7 +73,7 @@
 
 	revive_cost = 0
 	reviving = TRUE
-	owner << "<span class='notice'>You feel a faint buzzing as your reviver implant starts patching your wounds...</span>"
+	to_chat(owner, "<span class='notice'>You feel a faint buzzing as your reviver implant starts patching your wounds...</span>")
 
 /obj/item/organ/cyberimp/chest/reviver/proc/heal()
 	if(owner.getOxyLoss())
@@ -102,7 +102,7 @@
 		var/mob/living/carbon/human/H = owner
 		if(H.stat != DEAD && prob(50 / severity) && H.can_heartattack())
 			H.set_heartattack(TRUE)
-			H << "<span class='userdanger'>You feel a horrible agony in your chest!</span>"
+			to_chat(H, "<span class='userdanger'>You feel a horrible agony in your chest!</span>")
 			addtimer(CALLBACK(src, .proc/undo_heart_attack), 600 / severity)
 
 /obj/item/organ/cyberimp/chest/reviver/proc/undo_heart_attack()
@@ -111,13 +111,13 @@
 		return
 	H.set_heartattack(FALSE)
 	if(H.stat == CONSCIOUS)
-		H << "<span class='notice'>You feel your heart beating again!</span>"
+		to_chat(H, "<span class='notice'>You feel your heart beating again!</span>")
 
 
 /obj/item/organ/cyberimp/chest/thrusters
 	name = "implantable thrusters set"
 	desc = "An implantable set of thruster ports. They use the gas from environment or subject's internals for propulsion in zero-gravity areas. \
-	Unlike regular jetpack, this device has no stablilzation system."
+	Unlike regular jetpack, this device has no stabilization system."
 	slot = "thrusters"
 	icon_state = "imp_jetpack"
 	origin_tech = "materials=4;magnets=4;biotech=4;engineering=5"
@@ -125,7 +125,7 @@
 	implant_color = null
 	actions_types = list(/datum/action/item_action/organ_action/toggle)
 	w_class = WEIGHT_CLASS_NORMAL
-	var/on = 0
+	var/on = FALSE
 	var/datum/effect_system/trail_follow/ion/ion_trail
 
 /obj/item/organ/cyberimp/chest/thrusters/Insert(mob/living/carbon/M, special = 0)
@@ -146,18 +146,18 @@
 	if(!on)
 		if(crit_fail)
 			if(!silent)
-				owner << "<span class='warning'>Your thrusters set seems to be broken!</span>"
+				to_chat(owner, "<span class='warning'>Your thrusters set seems to be broken!</span>")
 			return 0
-		on = 1
+		on = TRUE
 		if(allow_thrust(0.01))
 			ion_trail.start()
 			if(!silent)
-				owner << "<span class='notice'>You turn your thrusters set on.</span>"
+				to_chat(owner, "<span class='notice'>You turn your thrusters set on.</span>")
 	else
 		ion_trail.stop()
 		if(!silent)
-			owner << "<span class='notice'>You turn your thrusters set off.</span>"
-		on = 0
+			to_chat(owner, "<span class='notice'>You turn your thrusters set off.</span>")
+		on = FALSE
 	update_icon()
 
 /obj/item/organ/cyberimp/chest/thrusters/update_icon()
@@ -189,7 +189,7 @@
 		return 1
 
 	// Priority 3: use internals tank.
-	var/obj/item/weapon/tank/I = owner.internal
+	var/obj/item/tank/I = owner.internal
 	if(I && I.air_contents && I.air_contents.total_moles() > num)
 		var/datum/gas_mixture/removed = I.air_contents.remove(num)
 		if(removed.total_moles() > 0.005)

@@ -124,7 +124,7 @@
 
 /datum/reagent/toxin/slimejelly/on_mob_life(mob/living/M)
 	if(prob(10))
-		M << "<span class='danger'>Your insides are burning!</span>"
+		to_chat(M, "<span class='danger'>Your insides are burning!</span>")
 		M.adjustToxLoss(rand(20,60)*REM, 0)
 		. = 1
 	else if(prob(40))
@@ -165,7 +165,7 @@
 /datum/reagent/toxin/zombiepowder/on_mob_life(mob/living/carbon/M)
 	M.status_flags |= FAKEDEATH
 	M.adjustOxyLoss(0.5*REM, 0)
-	M.Weaken(5, 0)
+	M.Knockdown(100, 0)
 	M.silent = max(M.silent, 5)
 	M.tod = worldtime2text()
 	..()
@@ -196,12 +196,12 @@
 	taste_mult = 1
 
 /datum/reagent/toxin/plantbgone/reaction_obj(obj/O, reac_volume)
-	if(istype(O,/obj/structure/alien/weeds))
+	if(istype(O, /obj/structure/alien/weeds))
 		var/obj/structure/alien/weeds/alien_weeds = O
 		alien_weeds.take_damage(rand(15,35), BRUTE, 0) // Kills alien weeds pretty fast
-	else if(istype(O,/obj/structure/glowshroom)) //even a small amount is enough to kill it
+	else if(istype(O, /obj/structure/glowshroom)) //even a small amount is enough to kill it
 		qdel(O)
-	else if(istype(O,/obj/structure/spacevine))
+	else if(istype(O, /obj/structure/spacevine))
 		var/obj/structure/spacevine/SV = O
 		SV.on_chem_effect(src)
 
@@ -275,26 +275,30 @@
 			M.confused += 2
 			M.drowsyness += 2
 		if(10 to 50)
-			M.Sleeping(2, 0)
+			M.Sleeping(40, 0)
 			. = 1
 		if(51 to INFINITY)
-			M.Sleeping(2, 0)
+			M.Sleeping(40, 0)
 			M.adjustToxLoss((current_cycle - 50)*REM, 0)
 			. = 1
 	..()
 
-/datum/reagent/toxin/chloralhydrate/delayed
+/datum/reagent/toxin/chloralhydratedelayed
+	name = "Chloral Hydrate"
 	id = "chloralhydrate2"
+	description = "A powerful sedative that induces confusion and drowsiness before putting its target to sleep."
+	reagent_state = SOLID
+	color = "#000067" // rgb: 0, 0, 103
+	toxpwr = 0
+	metabolization_rate = 1.5 * REAGENTS_METABOLISM
 
-/datum/reagent/toxin/chloralhydrate/delayed/on_mob_life(mob/living/M)
+/datum/reagent/toxin/chloralhydratedelayed/on_mob_life(mob/living/M)
 	switch(current_cycle)
-		if(1 to 10)
-			return
 		if(10 to 20)
 			M.confused += 1
 			M.drowsyness += 1
 		if(20 to INFINITY)
-			M.Sleeping(2, 0)
+			M.Sleeping(40, 0)
 	..()
 
 /datum/reagent/toxin/beer2	//disguised as normal beer for use by emagged brobots
@@ -304,13 +308,16 @@
 	color = "#664300" // rgb: 102, 67, 0
 	metabolization_rate = 1.5 * REAGENTS_METABOLISM
 	taste_description = "piss water"
+	glass_icon_state = "beerglass"
+	glass_name = "glass of beer"
+	glass_desc = "A freezing pint of beer."
 
 /datum/reagent/toxin/beer2/on_mob_life(mob/living/M)
 	switch(current_cycle)
 		if(1 to 50)
-			M.Sleeping(2, 0)
+			M.Sleeping(40, 0)
 		if(51 to INFINITY)
-			M.Sleeping(2, 0)
+			M.Sleeping(40, 0)
 			M.adjustToxLoss((current_cycle - 50)*REM, 0)
 	return ..()
 
@@ -383,7 +390,7 @@
 	if(prob(50))
 		switch(pick(1, 2, 3, 4))
 			if(1)
-				M << "<span class='danger'>You can barely see!</span>"
+				to_chat(M, "<span class='danger'>You can barely see!</span>")
 				M.blur_eyes(3)
 			if(2)
 				M.emote("cough")
@@ -391,7 +398,7 @@
 				M.emote("sneeze")
 			if(4)
 				if(prob(75))
-					M << "You scratch at an itch."
+					to_chat(M, "You scratch at an itch.")
 					M.adjustBruteLoss(2*REM, 0)
 					. = 1
 	..()
@@ -453,7 +460,7 @@
 		M.adjustToxLoss(1*REM, 0)
 		. = 1
 	if(current_cycle >= 18)
-		M.Sleeping(2, 0)
+		M.Sleeping(40, 0)
 		. = 1
 	..()
 
@@ -470,8 +477,8 @@
 	if(prob(5))
 		M.losebreath += 1
 	if(prob(8))
-		M << "You feel horrendously weak!"
-		M.Stun(2, 0)
+		to_chat(M, "You feel horrendously weak!")
+		M.Stun(40, 0)
 		M.adjustToxLoss(2*REM, 0)
 	return ..()
 
@@ -500,15 +507,15 @@
 
 /datum/reagent/toxin/itching_powder/on_mob_life(mob/living/M)
 	if(prob(15))
-		M << "You scratch at your head."
+		to_chat(M, "You scratch at your head.")
 		M.adjustBruteLoss(0.2*REM, 0)
 		. = 1
 	if(prob(15))
-		M << "You scratch at your leg."
+		to_chat(M, "You scratch at your leg.")
 		M.adjustBruteLoss(0.2*REM, 0)
 		. = 1
 	if(prob(15))
-		M << "You scratch at your arm."
+		to_chat(M, "You scratch at your arm.")
 		M.adjustBruteLoss(0.2*REM, 0)
 		. = 1
 	if(prob(3))
@@ -531,8 +538,7 @@
 		var/picked_option = rand(1,3)
 		switch(picked_option)
 			if(1)
-				M.Stun(3, 0)
-				M.Weaken(3, 0)
+				M.Knockdown(60, 0)
 				. = 1
 			if(2)
 				M.losebreath += 10
@@ -563,7 +569,7 @@
 
 /datum/reagent/toxin/pancuronium/on_mob_life(mob/living/M)
 	if(current_cycle >= 10)
-		M.Paralyse(2, 0)
+		M.Stun(40, 0)
 		. = 1
 	if(prob(20))
 		M.losebreath += 4
@@ -580,7 +586,7 @@
 
 /datum/reagent/toxin/sodium_thiopental/on_mob_life(mob/living/M)
 	if(current_cycle >= 10)
-		M.Sleeping(2, 0)
+		M.Sleeping(40, 0)
 	M.adjustStaminaLoss(10*REM, 0)
 	..()
 	. = 1
@@ -596,7 +602,7 @@
 
 /datum/reagent/toxin/sulfonal/on_mob_life(mob/living/M)
 	if(current_cycle >= 22)
-		M.Sleeping(2, 0)
+		M.Sleeping(40, 0)
 	return ..()
 
 /datum/reagent/toxin/amanitin
@@ -610,9 +616,8 @@
 
 /datum/reagent/toxin/amanitin/on_mob_delete(mob/living/M)
 	var/toxdamage = current_cycle*3*REM
+	M.log_message("has taken [toxdamage] toxin damage from amanitin toxin", INDIVIDUAL_ATTACK_LOG)
 	M.adjustToxLoss(toxdamage)
-	if(M)
-		add_logs(M, get_turf(M), "has taken [toxdamage] toxin damage from amanitin toxin")
 	..()
 
 /datum/reagent/toxin/lipolicide
@@ -645,6 +650,34 @@
 	M.losebreath += 5
 	return ..()
 
+/datum/reagent/toxin/spewium
+	name = "Spewium"
+	id = "spewium"
+	description = "A powerful emetic, causes uncontrollable vomiting.  May result in vomiting organs at high doses."
+	reagent_state = LIQUID
+	color = "#2f6617" //A sickly green color
+	metabolization_rate = REAGENTS_METABOLISM
+	overdose_threshold = 29
+	toxpwr = 0
+	taste_description = "vomit"
+
+/datum/reagent/toxin/spewium/on_mob_life(mob/living/M)
+	.=..()
+	if(current_cycle >=11 && prob(min(50,current_cycle)) && ishuman(M))
+		var/mob/living/carbon/human/H = M
+		H.vomit(10, prob(10), prob(50), rand(0,4), TRUE, prob(30))
+		for(var/datum/reagent/toxin/R in M.reagents.reagent_list)
+			if(R != src)
+				H.reagents.remove_reagent(R.id,1)
+
+/datum/reagent/toxin/spewium/overdose_process(mob/living/M)
+	. = ..()
+	if(current_cycle >=33 && prob(15) && ishuman(M))
+		var/mob/living/carbon/human/H = M
+		H.spew_organ()
+		H.vomit(0, TRUE, TRUE, 4)
+		to_chat(H, "<span class='userdanger'>You feel something lumpy come up as you vomit.</span>")
+
 /datum/reagent/toxin/curare
 	name = "Curare"
 	id = "curare"
@@ -656,7 +689,7 @@
 
 /datum/reagent/toxin/curare/on_mob_life(mob/living/M)
 	if(current_cycle >= 11)
-		M.Weaken(3, 0)
+		M.Knockdown(60, 0)
 	M.adjustOxyLoss(1*REM, 0)
 	. = 1
 	..()
@@ -784,7 +817,7 @@
 	C.acid_act(acidpwr, reac_volume)
 
 /datum/reagent/toxin/acid/reaction_obj(obj/O, reac_volume)
-	if(istype(O.loc, /mob)) //handled in human acid_act()
+	if(ismob(O.loc)) //handled in human acid_act()
 		return
 	reac_volume = round(reac_volume,0.1)
 	O.acid_act(acidpwr, reac_volume)
@@ -798,7 +831,7 @@
 /datum/reagent/toxin/acid/fluacid
 	name = "Fluorosulfuric acid"
 	id = "facid"
-	description = "Fluorosulfuric acid is a an extremely corrosive chemical substance."
+	description = "Fluorosulfuric acid is an extremely corrosive chemical substance."
 	color = "#5050FF"
 	toxpwr = 2
 	acidpwr = 42.0
@@ -822,7 +855,7 @@
 	if(M.dizziness < 6)
 		M.dizziness = Clamp(M.dizziness + 3, 0, 5)
 	if(prob(20))
-		M << "You feel confused and disorientated."
+		to_chat(M, "You feel confused and disorientated.")
 	..()
 
 /datum/reagent/toxin/peaceborg/tire
@@ -838,7 +871,7 @@
 	if(M.staminaloss < (45 - healthcomp))	//At 50 health you would have 200 - 150 health meaning 50 compensation. 60 - 50 = 10, so would only do 10-19 stamina.)
 		M.adjustStaminaLoss(10)
 	if(prob(30))
-		M << "You should sit down and take a rest..."
+		to_chat(M, "You should sit down and take a rest...")
 	..()
 
 /datum/reagent/toxin/delayed
@@ -857,7 +890,7 @@
 		holder.remove_reagent(id, actual_metaboliztion_rate * M.metabolism_efficiency)
 		M.adjustToxLoss(actual_toxpwr*REM, 0)
 		if(prob(10))
-			M.Weaken(1, 0)
+			M.Knockdown(20, 0)
 		. = 1
 	..()
 

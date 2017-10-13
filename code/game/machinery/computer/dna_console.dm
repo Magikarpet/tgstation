@@ -21,48 +21,44 @@
 	desc = "Scan DNA."
 	icon_screen = "dna"
 	icon_keyboard = "med_key"
-	density = 1
-	circuit = /obj/item/weapon/circuitboard/computer/scan_consolenew
+	density = TRUE
+	circuit = /obj/item/circuitboard/computer/scan_consolenew
 	var/radduration = 2
 	var/radstrength = 1
 
 	var/list/buffer[NUMBER_OF_BUFFERS]
 
-	var/injectorready = 0	//Quick fix for issue 286 (screwdriver the screen twice to restore injector)	-Pete
+	var/injectorready = 0	//world timer cooldown var
 	var/current_screen = "mainmenu"
 	var/obj/machinery/dna_scannernew/connected = null
-	var/obj/item/weapon/disk/data/diskette = null
+	var/obj/item/disk/data/diskette = null
 	var/list/delayed_action = null
-	anchored = 1
-	use_power = 1
+	anchored = TRUE
+	use_power = IDLE_POWER_USE
 	idle_power_usage = 10
 	active_power_usage = 400
 
+	light_color = LIGHT_COLOR_BLUE
+
 /obj/machinery/computer/scan_consolenew/attackby(obj/item/I, mob/user, params)
-	if (istype(I, /obj/item/weapon/disk/data)) //INSERT SOME DISKETTES
+	if (istype(I, /obj/item/disk/data)) //INSERT SOME DISKETTES
 		if (!src.diskette)
-			if(!user.drop_item())
+			if (!user.transferItemToLoc(I,src))
 				return
-			I.loc = src
 			src.diskette = I
-			user << "<span class='notice'>You insert [I].</span>"
+			to_chat(user, "<span class='notice'>You insert [I].</span>")
 			src.updateUsrDialog()
 			return
 	else
 		return ..()
 
-/obj/machinery/computer/scan_consolenew/New()
-	..()
-
-	spawn(5)
-		for(dir in list(NORTH,EAST,SOUTH,WEST))
-			connected = locate(/obj/machinery/dna_scannernew, get_step(src, dir))
-			if(!isnull(connected))
-				break
-		spawn(250)
-			injectorready = 1
-		return
-	return
+/obj/machinery/computer/scan_consolenew/Initialize()
+	. = ..()
+	for(dir in list(NORTH,EAST,SOUTH,WEST))
+		connected = locate(/obj/machinery/dna_scannernew, get_step(src, dir))
+		if(!isnull(connected))
+			break
+	injectorready = world.time + INJECTOR_TIMEOUT
 
 /obj/machinery/computer/scan_consolenew/attack_hand(mob/user)
 	if(..())
@@ -70,7 +66,8 @@
 	ShowInterface(user)
 
 /obj/machinery/computer/scan_consolenew/proc/ShowInterface(mob/user, last_change)
-	if(!user) return
+	if(!user)
+		return
 	var/datum/browser/popup = new(user, "scannernew", "DNA Modifier Console", 800, 630) // Set up the popup browser window
 	if(!(in_range(src, user) || issilicon(user)))
 		popup.close()
@@ -84,7 +81,7 @@
 	if(connected && connected.is_operational())
 		if(connected.occupant)	//set occupant_status message
 			viable_occupant = connected.occupant
-			if(viable_occupant.has_dna() && (!(viable_occupant.disabilities & NOCLONE) || (connected.scan_level == 3)))	//occupent is viable for dna modification
+			if(viable_occupant.has_dna() && (!(RADIMMUNE in viable_occupant.dna.species.species_traits)) && (!(viable_occupant.disabilities & NOCLONE) || (connected.scan_level == 3))) //occupant is viable for dna modification
 				occupant_status += "[viable_occupant.name] => "
 				switch(viable_occupant.stat)
 					if(CONSCIOUS)
@@ -172,7 +169,7 @@
 		if("working")
 			temp_html += status
 			temp_html += "<h1>System Busy</h1>"
-			temp_html += "Working ... Please wait ([radduration] Seconds)"
+			temp_html += "Working ... Please wait ([DisplayTimeText(radduration*10)])"
 		if("buffer")
 			temp_html += status
 			temp_html += buttons
@@ -211,7 +208,7 @@
 							else
 								temp_html += "<span class='linkOff'>Occupant</span>"
 							temp_html += "<a href='?src=\ref[src];task=setdelayed;num=[i];delayaction=[SCANNER_ACTION_UE]'>Occupant:Delayed</a> "
-							if(injectorready)
+							if(injectorready < world.time)
 								temp_html += "<a href='?src=\ref[src];task=injector;num=[i];text=ue'>Injector</a>"
 							else
 								temp_html += "<span class='linkOff'>Injector</span>"
@@ -225,7 +222,7 @@
 							else
 								temp_html += "<span class='linkOff'>Occupant</span>"
 							temp_html += "<a href='?src=\ref[src];task=setdelayed;num=[i];delayaction=[SCANNER_ACTION_UI]'>Occupant:Delayed</a> "
-							if(injectorready)
+							if(injectorready < world.time)
 								temp_html += "<a href='?src=\ref[src];task=injector;num=[i];text=ui'>Injector</a>"
 							else
 								temp_html += "<span class='linkOff'>Injector</span>"
@@ -238,7 +235,7 @@
 							else
 								temp_html += "<span class='linkOff'>Occupant</span>"
 							temp_html += "<a href='?src=\ref[src];task=setdelayed;num=[i];delayaction=[SCANNER_ACTION_MIXED]'>Occupant:Delayed</a> "
-							if(injectorready)
+							if(injectorready < world.time)
 								temp_html += "<a href='?src=\ref[src];task=injector;num=[i];text=mixed'>UI+UE Injector</a>"
 							else
 								temp_html += "<span class='linkOff'>UI+UE Injector</span>"
@@ -249,7 +246,7 @@
 							else
 								temp_html += "<span class='linkOff'>Occupant</span> "
 							temp_html += "<a href='?src=\ref[src];task=setdelayed;num=[i];delayaction=[SCANNER_ACTION_SE]'>Occupant:Delayed</a> "
-							if(injectorready)
+							if(injectorready < world.time )
 								temp_html += "<a href='?src=\ref[src];task=injector;num=[i];text=se'>Injector</a>"
 							else
 								temp_html += "<span class='linkOff'>Injector</span>"
@@ -389,22 +386,22 @@
 					if("mixed")
 						apply_buffer(SCANNER_ACTION_MIXED,num)
 		if("injector")
-			if(num && injectorready)
+			if(num && injectorready < world.time)
 				num = Clamp(num, 1, NUMBER_OF_BUFFERS)
 				var/list/buffer_slot = buffer[num]
 				if(istype(buffer_slot))
-					var/obj/item/weapon/dnainjector/timed/I
+					var/obj/item/dnainjector/timed/I
 					switch(href_list["text"])
 						if("se")
 							if(buffer_slot["SE"])
-								I = new /obj/item/weapon/dnainjector/timed(loc)
+								I = new /obj/item/dnainjector/timed(loc)
 								var/powers = 0
-								for(var/datum/mutation/human/HM in good_mutations + bad_mutations + not_good_mutations)
+								for(var/datum/mutation/human/HM in GLOB.good_mutations + GLOB.bad_mutations + GLOB.not_good_mutations)
 									if(HM.check_block_string(buffer_slot["SE"]))
 										I.add_mutations.Add(HM)
-										if(HM in good_mutations)
+										if(HM in GLOB.good_mutations)
 											powers += 1
-										if(HM in bad_mutations + not_good_mutations)
+										if(HM in GLOB.bad_mutations + GLOB.not_good_mutations)
 											powers -= 1 //To prevent just unlocking everything to get all powers to a syringe for max tech
 									else
 										I.remove_mutations.Add(HM)
@@ -420,26 +417,24 @@
 									I.damage_coeff  = connected.damage_coeff
 						if("ui")
 							if(buffer_slot["UI"])
-								I = new /obj/item/weapon/dnainjector/timed(loc)
+								I = new /obj/item/dnainjector/timed(loc)
 								I.fields = list("UI"=buffer_slot["UI"])
 								if(connected)
 									I.damage_coeff = connected.damage_coeff
 						if("ue")
 							if(buffer_slot["name"] && buffer_slot["UE"] && buffer_slot["blood_type"])
-								I = new /obj/item/weapon/dnainjector/timed(loc)
+								I = new /obj/item/dnainjector/timed(loc)
 								I.fields = list("name"=buffer_slot["name"], "UE"=buffer_slot["UE"], "blood_type"=buffer_slot["blood_type"])
 								if(connected)
 									I.damage_coeff  = connected.damage_coeff
 						if("mixed")
 							if(buffer_slot["UI"] && buffer_slot["name"] && buffer_slot["UE"] && buffer_slot["blood_type"])
-								I = new /obj/item/weapon/dnainjector/timed(loc)
+								I = new /obj/item/dnainjector/timed(loc)
 								I.fields = list("UI"=buffer_slot["UI"],"name"=buffer_slot["name"], "UE"=buffer_slot["UE"], "blood_type"=buffer_slot["blood_type"])
 								if(connected)
 									I.damage_coeff = connected.damage_coeff
 					if(I)
-						injectorready = 0
-						spawn(INJECTOR_TIMEOUT)
-							injectorready = 1
+						injectorready = world.time + INJECTOR_TIMEOUT
 		if("loaddisk")
 			if(num && diskette && diskette.fields)
 				num = Clamp(num, 1, NUMBER_OF_BUFFERS)
@@ -453,7 +448,7 @@
 					diskette.fields = buffer_slot.Copy()
 		if("ejectdisk")
 			if(diskette)
-				diskette.loc = get_turf(src)
+				diskette.forceMove(drop_location())
 				diskette = null
 		if("setdelayed")
 			if(num)
@@ -464,7 +459,7 @@
 				radstrength = Wrap(radstrength, 1, RADIATION_STRENGTH_MAX+1)
 
 				var/locked_state = connected.locked
-				connected.locked = 1
+				connected.locked = TRUE
 
 				current_screen = "working"
 				ShowInterface(usr)
@@ -572,7 +567,7 @@
 					viable_occupant.dna.blood_type = buffer_slot["blood_type"]
 
 /obj/machinery/computer/scan_consolenew/proc/on_scanner_close()
-	connected.occupant << "<span class='notice'>[src] activates!</span>"
+	to_chat(connected.occupant, "<span class='notice'>[src] activates!</span>")
 	if(delayed_action)
 		apply_buffer(delayed_action["action"],delayed_action["buffer"])
 		delayed_action = null //or make it stick + reset button ?

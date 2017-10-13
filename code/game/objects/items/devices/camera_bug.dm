@@ -15,7 +15,7 @@
 	throw_speed	= 4
 	throw_range	= 20
 	origin_tech = "syndicate=1;engineering=3"
-	flags = NOBLUDGEON
+	flags_1 = NOBLUDGEON_1
 
 	var/obj/machinery/camera/current = null
 
@@ -63,7 +63,7 @@
 		return 0
 	var/turf/T = get_turf(user.loc)
 	if(T.z != current.z || !current.can_use())
-		user << "<span class='danger'>[src] has lost the signal.</span>"
+		to_chat(user, "<span class='danger'>[src] has lost the signal.</span>")
 		current = null
 		user.unset_machine()
 		return 0
@@ -74,7 +74,7 @@
 /obj/item/device/camera_bug/proc/get_cameras()
 	if( world.time > (last_net_update + 100))
 		bugged_cameras = list()
-		for(var/obj/machinery/camera/camera in cameranet.cameras)
+		for(var/obj/machinery/camera/camera in GLOB.cameranet.cameras)
 			if(camera.stat || !camera.can_use())
 				continue
 			if(length(list("SS13","MINE")&camera.network))
@@ -124,7 +124,8 @@
 						// 15 second intervals ~ 1/4 minute
 						var/m = round(time_diff/4)
 						var/s = (time_diff - 4*m) * 15
-						if(!s) s = "00"
+						if(!s)
+							s = "00"
 						html += "Last seen near [outstring] ([m]:[s] minute\s ago)<br>"
 					if( C && (C.bug == src)) //Checks to see if the camera has a bug
 						html += "<a href='?src=\ref[src];emp=\ref[C]'>\[Disable\]</a>"
@@ -218,7 +219,7 @@
 		var/list/cameras = flatten_list(bugged_cameras)
 		var/obj/machinery/camera/C = locate(href_list["emp"]) in cameras
 		if(C && istype(C) && C.bug == src)
-			C.emp_act(1)
+			C.emp_act(EMP_HEAVY)
 			C.bug = null
 			bugged_cameras -= C.c_tag
 		interact()
@@ -233,11 +234,11 @@
 		var/obj/machinery/camera/C = locate(href_list["view"]) in cameras
 		if(C && istype(C))
 			if(!C.can_use())
-				usr << "<span class='warning'>Something's wrong with that camera!  You can't get a feed.</span>"
+				to_chat(usr, "<span class='warning'>Something's wrong with that camera!  You can't get a feed.</span>")
 				return
 			var/turf/T = get_turf(loc)
 			if(!T || C.z != T.z)
-				usr << "<span class='warning'>You can't get a signal!</span>"
+				to_chat(usr, "<span class='warning'>You can't get a signal!</span>")
 				return
 			current = C
 			spawn(6)

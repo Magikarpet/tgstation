@@ -20,7 +20,7 @@
 						<script language='javascript' type='text/javascript'>
 						[js_byjax]
 						[js_dropdowns]
-						function ticker() {
+						function SSticker() {
 						    setInterval(function(){
 						        window.location='byond://?src=\ref[src]&update_content=1';
 						    }, 1000);
@@ -28,7 +28,7 @@
 
 						window.onload = function() {
 							dropdowns();
-							ticker();
+							SSticker();
 						}
 						</script>
 						</head>
@@ -115,6 +115,7 @@
 						<div class='links'>
 						<a href='?src=\ref[src];toggle_id_upload=1'><span id='t_id_upload'>[add_req_access?"L":"Unl"]ock ID upload panel</span></a><br>
 						<a href='?src=\ref[src];toggle_maint_access=1'><span id='t_maint_access'>[maint_access?"Forbid":"Permit"] maintenance protocols</span></a><br>
+						<a href='?src=\ref[src];toggle_port_connection=1'><span id='t_port_connection'>[internal_tank.connected_port?"Disconnect from":"Connect to"] gas port</span></a><br>
 						<a href='?src=\ref[src];dna_lock=1'>DNA-lock</a><br>
 						<a href='?src=\ref[src];view_log=1'>View internal log</a><br>
 						<a href='?src=\ref[src];change_name=1'>Change exosuit name</a><br>
@@ -157,8 +158,9 @@
 
 
 
-/obj/mecha/proc/output_access_dialog(obj/item/weapon/card/id/id_card, mob/user)
-	if(!id_card || !user) return
+/obj/mecha/proc/output_access_dialog(obj/item/card/id/id_card, mob/user)
+	if(!id_card || !user)
+		return
 	. = {"<html>
 						<head><style>
 						h1 {font-size:15px;margin-bottom:4px;}
@@ -172,9 +174,11 @@
 		. += "[get_access_desc(a)] - <a href='?src=\ref[src];del_req_access=[a];user=\ref[user];id_card=\ref[id_card]'>Delete</a><br>"
 	. += "<hr><h1>Following keycodes were detected on portable device:</h1>"
 	for(var/a in id_card.access)
-		if(a in operation_req_access) continue
+		if(a in operation_req_access)
+			continue
 		var/a_name = get_access_desc(a)
-		if(!a_name) continue //there's some strange access without a name
+		if(!a_name)
+			continue //there's some strange access without a name
 		. += "[a_name] - <a href='?src=\ref[src];add_req_access=[a];user=\ref[user];id_card=\ref[id_card]'>Add</a><br>"
 	. += "<hr><a href='?src=\ref[src];finish_req_access=1;user=\ref[user]'>Finish</a> "
 	. += "<span class='danger'>(Warning! The ID upload panel will be locked. It can be unlocked only through Exosuit Interface.)</span>"
@@ -183,8 +187,9 @@
 	onclose(user, "exosuit_add_access")
 
 
-/obj/mecha/proc/output_maintenance_dialog(obj/item/weapon/card/id/id_card,mob/user)
-	if(!id_card || !user) return
+/obj/mecha/proc/output_maintenance_dialog(obj/item/card/id/id_card,mob/user)
+	if(!id_card || !user)
+		return
 	. = {"<html>
 						<head>
 						<style>
@@ -228,10 +233,10 @@
 			if(user)
 				if(state==0)
 					state = 1
-					user << "The securing bolts are now exposed."
+					to_chat(user, "The securing bolts are now exposed.")
 				else if(state==1)
 					state = 0
-					user << "The securing bolts are now hidden."
+					to_chat(user, "The securing bolts are now hidden.")
 				output_maintenance_dialog(filter.getObj("id_card"),user)
 
 		if(href_list["set_internal_tank_valve"] && state >=1)
@@ -240,7 +245,7 @@
 				var/new_pressure = input(user,"Input new output pressure","Pressure setting",internal_tank_valve) as num
 				if(new_pressure)
 					internal_tank_valve = new_pressure
-					user << "The internal pressure valve has been set to [internal_tank_valve]kPa."
+					to_chat(user, "The internal pressure valve has been set to [internal_tank_valve]kPa.")
 
 		if(href_list["add_req_access"] && add_req_access && filter.getObj("id_card"))
 			operation_req_access += filter.getNum("add_req_access")
@@ -306,9 +311,27 @@
 		maint_access = !maint_access
 		send_byjax(src.occupant,"exosuit.browser","t_maint_access","[maint_access?"Forbid":"Permit"] maintenance protocols")
 
+	if (href_list["toggle_port_connection"])
+		if(internal_tank.connected_port)
+			if(internal_tank.disconnect())
+				occupant_message("Disconnected from the air system port.")
+				log_message("Disconnected from gas port.")
+			else
+				occupant_message("<span class='warning'>Unable to disconnect from the air system port!</span>")
+				return
+		else
+			var/obj/machinery/atmospherics/components/unary/portables_connector/possible_port = locate() in loc
+			if(internal_tank.connect(possible_port))
+				occupant_message("Connected to the air system port.")
+				log_message("Connected to gas port.")
+			else
+				occupant_message("<span class='warning'>Unable to connect with air system port!</span>")
+				return
+		send_byjax(occupant,"exosuit.browser","t_port_connection","[internal_tank.connected_port?"Disconnect from":"Connect to"] gas port")
+
 	if(href_list["dna_lock"])
 		if(occupant && !iscarbon(occupant))
-			occupant << "<span class='danger'> You do not have any DNA!</span>"
+			to_chat(occupant, "<span class='danger'> You do not have any DNA!</span>")
 			return
 		dna_lock = occupant.dna.unique_enzymes
 		occupant_message("You feel a prick as the needle takes your DNA sample.")
